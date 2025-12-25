@@ -96,8 +96,6 @@
 #         st.session_state.show_delete_confirm = None
 #     if "show_clear_confirm" not in st.session_state:
 #         st.session_state.show_clear_confirm = False
-#     if "auto_save_enabled" not in st.session_state:
-#         st.session_state.auto_save_enabled = True  # Enable auto-save by default
 
 # # Test Ollama connection and check if models are available
 # def check_models():
@@ -209,14 +207,6 @@
 #         return user_msg[:30] + ("..." if len(user_msg) > 30 else "")
 #     return "New Chat"
 
-# # Load user's chat history
-# def load_user_chat_history():
-#     if st.session_state.logged_in:
-#         user_data = get_user_data(st.session_state.username)
-#         st.session_state.chat_history = user_data.get("chat_history", [])
-#         return True
-#     return False
-
 # # Login page
 # def login_page():
 #     st.title("Welcome to Coder Chat 💻")
@@ -236,9 +226,10 @@
 #                 st.session_state.username = username
                 
 #                 # Load user's chat history
-#                 load_user_chat_history()
+#                 user_data = get_user_data(username)
+#                 st.session_state.chat_history = user_data.get("chat_history", [])
                 
-#                 st.success(f"Welcome back, {username}! Your chat history has been loaded.")
+#                 st.success(f"Welcome back, {username}!")
 #                 st.rerun()
 #             else:
 #                 st.error("Invalid username or password")
@@ -267,12 +258,6 @@
 
 # # Main app
 # def main_app():
-#     # Load user's chat history if not already loaded
-#     if st.session_state.logged_in and not st.session_state.chat_history:
-#         load_user_chat_history()
-#         if st.session_state.chat_history:
-#             st.info(f"Loaded {len(st.session_state.chat_history)} previous chat sessions.")
-    
 #     # Custom CSS with only sidebar model info background color changed
 #     st.markdown("""
 #     <style>
@@ -379,11 +364,6 @@
 #         .delete-button:hover {
 #             color: #ff5252;
 #         }
-#         .save-indicator {
-#             font-size: 0.8em;
-#             color: #4CAF50;
-#             margin-top: 5px;
-#         }
 #     </style>
 #     """, unsafe_allow_html=True)
     
@@ -452,13 +432,6 @@
 #         </div>
 #         """, unsafe_allow_html=True)
         
-#         # Auto-save setting
-#         st.subheader("Chat Settings")
-#         auto_save_enabled = st.checkbox("Auto-save chats", value=st.session_state.auto_save_enabled, 
-#                                         help="Automatically save your chats to history")
-#         if auto_save_enabled != st.session_state.auto_save_enabled:
-#             st.session_state.auto_save_enabled = auto_save_enabled
-        
 #         # Performance settings
 #         st.subheader("Performance Settings")
 #         batch_size = st.slider("Response Update Frequency", min_value=1, max_value=10, value=3, 
@@ -472,7 +445,6 @@
 #             st.write(f"Messages count: {len(st.session_state.messages)}")
 #             st.write(f"Chat history count: {len(st.session_state.chat_history)}")
 #             st.write(f"Selected model: {st.session_state.selected_model}")
-#             st.write(f"Auto-save enabled: {st.session_state.auto_save_enabled}")
 #         else:
 #             st.session_state.debug_mode = False
         
@@ -484,10 +456,6 @@
         
 #         # Chat history
 #         st.subheader("Chat History")
-        
-#         # Show save status
-#         if st.session_state.auto_save_enabled:
-#             st.markdown('<div class="save-indicator">✓ Auto-save enabled</div>', unsafe_allow_html=True)
         
 #         # Clear all history button
 #         if st.session_state.chat_history:
@@ -668,8 +636,8 @@
 #             # Add the complete response to the session state
 #             st.session_state.messages.append({"role": "assistant", "content": full_response})
             
-#             # Save chat with the model information if auto-save is enabled
-#             if st.session_state.auto_save_enabled and st.session_state.current_chat_id:
+#             # Save chat with the model information
+#             if st.session_state.current_chat_id:
 #                 title = get_chat_title(st.session_state.messages)
 #                 save_chat(st.session_state.current_chat_id, title, st.session_state.messages, st.session_state.selected_model)
 #         else:
@@ -705,7 +673,6 @@
 # if __name__ == "__main__":
 #     main()
 
-
 import streamlit as st
 import ollama
 from typing import List, Dict
@@ -739,20 +706,14 @@ def hash_password(password):
 
 # Check if user exists
 def user_exists(username):
-    try:
-        with open(USER_DATA_FILE, "r") as f:
-            users = json.load(f)
-        return username in users
-    except (json.JSONDecodeError, FileNotFoundError):
-        return False
+    with open(USER_DATA_FILE, "r") as f:
+        users = json.load(f)
+    return username in users
 
 # Register a new user
 def register_user(username, password, email):
-    try:
-        with open(USER_DATA_FILE, "r") as f:
-            users = json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        users = {}
+    with open(USER_DATA_FILE, "r") as f:
+        users = json.load(f)
     
     users[username] = {
         "password": hash_password(password),
@@ -767,32 +728,23 @@ def register_user(username, password, email):
 
 # Authenticate user
 def authenticate_user(username, password):
-    try:
-        with open(USER_DATA_FILE, "r") as f:
-            users = json.load(f)
-        
-        if username in users and users[username]["password"] == hash_password(password):
-            return True
-        return False
-    except (json.JSONDecodeError, FileNotFoundError):
-        return False
+    with open(USER_DATA_FILE, "r") as f:
+        users = json.load(f)
+    
+    if username in users and users[username]["password"] == hash_password(password):
+        return True
+    return False
 
 # Get user data
 def get_user_data(username):
-    try:
-        with open(USER_DATA_FILE, "r") as f:
-            users = json.load(f)
-        return users.get(username, {})
-    except (json.JSONDecodeError, FileNotFoundError):
-        return {}
+    with open(USER_DATA_FILE, "r") as f:
+        users = json.load(f)
+    return users.get(username, {})
 
 # Update user data
 def update_user_data(username, data):
-    try:
-        with open(USER_DATA_FILE, "r") as f:
-            users = json.load(f)
-    except (json.JSONDecodeError, FileNotFoundError):
-        users = {}
+    with open(USER_DATA_FILE, "r") as f:
+        users = json.load(f)
     
     users[username] = data
     
@@ -814,7 +766,7 @@ def init_session_state():
     if "debug_mode" not in st.session_state:
         st.session_state.debug_mode = False
     if "selected_model" not in st.session_state:
-        st.session_state.selected_model = None  # Will be set after checking available models
+        st.session_state.selected_model = "qwen3"  # Default model
     if "show_delete_confirm" not in st.session_state:
         st.session_state.show_delete_confirm = None
     if "show_clear_confirm" not in st.session_state:
@@ -825,81 +777,57 @@ def init_session_state():
 # Test Ollama connection and check if models are available
 def check_models():
     try:
-        # Try to get models with more robust error handling
-        models_response = ollama.list()
-        
-        # Debug: Print the response structure to understand what we're working with
-        if st.session_state.get("debug_mode", False):
-            st.write("Ollama response structure:", models_response)
-        
-        # Handle different response formats
-        available_models = []
-        
-        # Try to extract models from different possible response structures
-        if isinstance(models_response, dict):
-            if 'models' in models_response:
-                # Standard format
-                for model in models_response['models']:
-                    if isinstance(model, dict) and 'name' in model:
-                        available_models.append(model['name'])
-            elif 'model' in models_response:
-                # Alternative format
-                if isinstance(models_response['model'], list):
-                    for model in models_response['model']:
-                        if isinstance(model, dict) and 'name' in model:
-                            available_models.append(model['name'])
-                elif isinstance(models_response['model'], dict) and 'name' in models_response['model']:
-                    available_models.append(models_response['model']['name'])
-        
-        # If we still don't have models, try a direct approach
-        if not available_models:
-            # As a fallback, try to manually check for known models
-            known_models = ["llama3.2", "qwen3:0.6b", "qwen3", "codellama", "mistral"]
-            for model_name in known_models:
-                try:
-                    # Try to get model info to see if it exists
-                    ollama.show(model_name)
-                    available_models.append(model_name)
-                except:
-                    pass  # Model doesn't exist, continue to next
-        
-        return available_models
+        models = ollama.list()
+        return [m["model"].split(":")[0] for m in models["models"]]
     except Exception as e:
-        # More detailed error message for debugging
-        error_msg = f"Error checking available models: {str(e)}"
-        if st.session_state.get("debug_mode", False):
-            st.error(error_msg)
-            st.write("Exception details:", str(e))
+        st.error(f"Error checking available models: {e}")
         return []
 
-def generate_response_stream(messages: List[Dict[str, str]], model: str):
-    try:
-        # Add system instruction at the beginning of messages
-        system_message = {
-            "role": "system", 
-            "content": "You are a coding tutor who specializes in programming and computer science topics. Your purpose is to ONLY answer questions related to coding, programming languages, algorithms, data structures, software development, debugging, and other technical computer science concepts. If a user asks a question that is not related to coding or programming, politely decline and explain that you can only assist with coding-related questions. For coding questions, explain concepts step by step, assume the user is learning, provide analogies, examples, and small exercises. Always encourage the user and avoid just giving answers without explanation."
-        }
+
+# def generate_response_stream(messages: List[Dict[str, str]], model: str):
+#     try:
+#         # Add system instruction at the beginning of messages
+#         system_message = {
+#             "role": "system", 
+#             "content": "You are a coding tutor who specializes in programming and computer science topics. Your purpose is to ONLY answer questions related to coding, programming languages, algorithms, data structures, software development, debugging, and other technical computer science concepts. If a user asks a question that is not related to coding or programming, politely decline and explain that you can only assist with coding-related questions. For coding questions, explain concepts step by step, assume the user is learning, provide analogies, examples, and small exercises. Always encourage the user and avoid just giving answers without explanation."
+#         }
         
-        # Check if system message is already in the messages
-        if not messages or messages[0].get("role") != "system":
-            messages_with_system = [system_message] + messages
-        else:
-            messages_with_system = messages
+#         # Check if system message is already in the messages
+#         if not messages or messages[0].get("role") != "system":
+#             messages_with_system = [system_message] + messages
+#         else:
+#             messages_with_system = messages
             
-        # Generate streaming response with the selected model
-        response = ollama.chat(
-            model=model,
-            messages=messages_with_system,
-            stream=True  # Enable streaming
-        )
+#         # Generate streaming response with the selected model
+#         response = ollama.chat(
+#             model=model,
+#             messages=messages_with_system,
+#             stream=True  # Enable streaming
+#         )
         
-        return response
+#         return response
+#     except Exception as e:
+#         return None, str(e)
+def generate_response_stream(messages, model):
+    try:
+        system_message = {
+            "role": "system",
+            "content": "You are a coding tutor..."
+        }
+
+        if not messages or messages[0].get("role") != "system":
+            messages = [system_message] + messages
+
+        return ollama.chat(
+            model=model,
+            messages=messages,
+            stream=True
+        )
+
     except Exception as e:
-        # Return a more user-friendly error message
-        error_msg = str(e)
-        if "not found" in error_msg and "model" in error_msg:
-            error_msg = f"Model '{model}' not found. Please install it using `ollama pull {model}` in your terminal."
-        return None, error_msg
+        st.error(f"Ollama error: {e}")
+        return None
+
 
 # Save chat to history
 def save_chat(chat_id: str, title: str, messages: List[Dict[str, str]], model: str):
@@ -1034,14 +962,6 @@ def login_page():
 
 # Main app
 def main_app():
-    # Check available models first
-    available_models = check_models()
-    
-    # Set default model if not set or not available
-    if not st.session_state.selected_model or st.session_state.selected_model not in available_models:
-        if available_models:
-            st.session_state.selected_model = available_models[0]
-    
     # Load user's chat history if not already loaded
     if st.session_state.logged_in and not st.session_state.chat_history:
         load_user_chat_history()
@@ -1190,59 +1110,47 @@ def main_app():
         
         # Model selection
         st.subheader("Model Selection")
-        
+        # available_models = ["llama3.2", "qwen3"]
+        available_models = check_models()
         if not available_models:
-            st.error("No models found in Ollama. Please install at least one model.")
-            st.info("To install a model, run: `ollama pull <model_name>` in your terminal")
-            
-            # Add a manual model input as a fallback
-            st.subheader("Manual Model Entry")
-            manual_model = st.text_input("Enter model name manually:", placeholder="e.g., qwen3:0.6b")
-            if st.button("Use Manual Model"):
-                if manual_model:
-                    st.session_state.selected_model = manual_model
-                    st.rerun()
-        else:
-            # Use the available models from the check_models() function
-            selected_model = st.selectbox(
-                "Choose a model:",
-                available_models,
-                index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0
-            )
-            
-            # Update the selected model in session state
-            if selected_model != st.session_state.selected_model:
-                st.session_state.selected_model = selected_model
-                st.rerun()
-            
-            # Model info - changed background color to soft gray
-            model_info = {
-                "llama3.2": {
-                    "name": "Llama 3.2",
-                    "description": "Meta's advanced language model"
-                },
-                "qwen3:0.6b": {
-                    "name": "Qwen 3 (0.6B)",
-                    "description": "Alibaba's efficient language model (0.6B parameters)"
-                }
+            st.error("No Ollama models found. Please pull a model.")
+            st.stop()
+
+        selected_model = st.selectbox(
+            "Choose a model:",
+            available_models,
+            index=available_models.index(st.session_state.selected_model) if st.session_state.selected_model in available_models else 0
+        )
+        
+        # Update the selected model in session state
+        if selected_model != st.session_state.selected_model:
+            st.session_state.selected_model = selected_model
+            st.rerun()
+        
+        # Model info - changed background color to soft gray
+        model_info = {
+            "llama3.2": {
+                "name": "Llama 3.2",
+                "description": "Meta's advanced language model"
+            },
+            "qwen3": {
+                "name": "Qwen 3",
+                "description": "Alibaba's efficient language model"
             }
-            
-            # Get the base model name (without tag) for display
-            base_model = st.session_state.selected_model.split(':')[0]
-            current_model = model_info.get(st.session_state.selected_model, 
-                                         model_info.get(base_model, 
-                                                       {"name": st.session_state.selected_model, "description": "A language model"}))
-            
-            st.markdown(f"""
-            <div class="model-info">
-                <div class="model-info-container">
-                    <div>
-                        <strong class="model-name">Model:</strong> {current_model["name"]}<br>
-                        <small>{current_model["description"]}</small>
-                    </div>
+        }
+        
+        current_model = model_info.get(st.session_state.selected_model, {"name": "Unknown", "description": ""})
+        
+        st.markdown(f"""
+        <div class="model-info">
+            <div class="model-info-container">
+                <div>
+                    <strong class="model-name">Model:</strong> {current_model["name"]}<br>
+                    <small>{current_model["description"]}</small>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+        </div>
+        """, unsafe_allow_html=True)
         
         # Auto-save setting
         st.subheader("Chat Settings")
@@ -1265,7 +1173,6 @@ def main_app():
             st.write(f"Chat history count: {len(st.session_state.chat_history)}")
             st.write(f"Selected model: {st.session_state.selected_model}")
             st.write(f"Auto-save enabled: {st.session_state.auto_save_enabled}")
-            st.write(f"Available models: {available_models}")
         else:
             st.session_state.debug_mode = False
         
@@ -1309,9 +1216,9 @@ def main_app():
                 # Display model icon next to chat title if available
                 model_icon = ""
                 if "model" in chat:
-                    if "llama3.2" in chat["model"]:
+                    if chat["model"] == "llama3.2":
                         model_icon = "🦙 "
-                    elif "qwen3" in chat["model"]:
+                    elif chat["model"] == "qwen3":
                         model_icon = "🌟 "
                 
                 # Chat item container
